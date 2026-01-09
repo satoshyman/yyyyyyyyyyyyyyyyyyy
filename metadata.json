@@ -1,0 +1,8 @@
+{
+  "name": "BeeClaimer Clone",
+  "description": "A high-fidelity clone of the BeeClaimer mining and faucet application, featuring real-time state sync, referral systems, and a hidden admin panel.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

@@ -1,0 +1,72 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BeeClaimer - Perfect Fit</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              gold: '#FFD700',
+              'card-bg': 'rgba(18, 18, 18, 0.8)',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            animation: {
+              'pulse-gold': 'readyPulse 2s infinite',
+              'wobble': 'iconWobble 1.5s infinite ease-in-out',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      @keyframes readyPulse {
+        0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
+      }
+      @keyframes iconWobble {
+        0% { transform: scale(1) rotate(0deg); }
+        25% { transform: scale(1.1) rotate(5deg); }
+        50% { transform: scale(1.1) rotate(-5deg); }
+        100% { transform: scale(1) rotate(0deg); }
+      }
+      body {
+        background-color: #000;
+        color: white;
+        overflow-x: hidden;
+      }
+      .bg-glow {
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(circle at 50% 0%, #1a1a1a 0%, #000 80%);
+        z-index: -1;
+      }
+      /* Hide scrollbar */
+      ::-webkit-scrollbar { display: none; }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "firebase/": "https://esm.sh/firebase@^12.7.0/",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3"
+  }
+}
+</script>
+</head>
+<body>
+    <div class="bg-glow"></div>
+    <div id="root"></div>
+    <script src='//libtl.com/sdk.js' data-zone='10428594' data-sdk='show_10428594'></script>
+</body>
+</html>
