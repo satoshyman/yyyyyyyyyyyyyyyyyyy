@@ -15,7 +15,7 @@ const App: React.FC = () => {
   const [config, setConfig] = useState<AppConfig>({
     rewards: { mine: 0.00001, faucet: 0.00001, daily: 0.0001 },
     ads: { mine: "#", faucet: "#", daily: "#", double: "#" },
-    limits: { min_withdraw: 0.0001, font_percent: 10, ref_bonus: 0.0001 },
+    limits: { min_withdraw: 0.0001, ref_percent: 10, ref_bonus: 0.0001 },
     api_key: ""
   });
   const [user, setUser] = useState<UserData | null>(null);
@@ -134,9 +134,10 @@ const App: React.FC = () => {
           newUser.referrer = referrerId;
           db.ref(`users/${referrerId}`).transaction(rData => {
             if (rData) {
+              const bonus = config.limits.ref_bonus || 0.0001;
               rData.friends = (rData.friends || 0) + 1;
-              rData.balance = (rData.balance || 0) + (config.limits.ref_bonus || 0.0001);
-              rData.refEarned = (rData.refEarned || 0) + (config.limits.ref_bonus || 0.0001);
+              rData.balance = (rData.balance || 0) + bonus;
+              rData.refEarned = (rData.refEarned || 0) + bonus;
             }
             return rData;
           });
@@ -153,6 +154,8 @@ const App: React.FC = () => {
         const list: Withdrawal[] = [];
         snap.forEach(child => { list.push(child.val()); });
         setWithdrawals(list.reverse());
+      } else {
+        setWithdrawals([]);
       }
     });
 
@@ -301,16 +304,17 @@ const App: React.FC = () => {
 
   const handleWithdraw = async () => {
     const email = (document.getElementById('emailInp') as HTMLInputElement).value;
-    const amt = parseFloat((document.getElementById('withdrawAmtInp') as HTMLInputElement).value);
+    const amtInput = document.getElementById('withdrawAmtInp') as HTMLInputElement;
+    const amt = parseFloat(amtInput.value);
 
     if (!email.includes('@') || isNaN(amt) || amt < config.limits.min_withdraw || amt > (user?.balance || 0)) {
-      getTele()?.showAlert("Invalid inputs or insufficient balance.");
+      getTele()?.showAlert(`Error: Minimum payout is ${config.limits.min_withdraw} TON. Please check your balance and email address.`);
       return;
     }
 
     const btn = document.getElementById('withdrawBtn') as HTMLButtonElement;
     btn.disabled = true;
-    btn.innerText = "Processing Instant Payout...";
+    btn.innerText = "Processing request...";
 
     let status: 'PENDING' | 'PAID' = 'PENDING';
 
@@ -330,15 +334,15 @@ const App: React.FC = () => {
         const result = await response.json();
         if (result.status === 200) {
           status = 'PAID';
-          getTele()?.showAlert("Success! Instant payout sent to your FaucetPay account.");
+          getTele()?.showAlert("Success! Payout sent instantly to your FaucetPay account.");
         } else {
           getTele()?.showAlert("API Error: " + result.message);
         }
       } catch (err) {
-        getTele()?.showAlert("Connection failed. Saved as pending.");
+        getTele()?.showAlert("Auto-payout failed. Request saved as 'PENDING' for manual review.");
       }
     } else {
-      getTele()?.showAlert("Manual Mode: Request saved.");
+      getTele()?.showAlert("Withdrawal request received. Reviewing manually.");
     }
 
     db.ref('withdrawals').push({
@@ -389,13 +393,11 @@ const App: React.FC = () => {
 
   return (
     <div className="container mx-auto max-w-[420px] px-3 h-screen flex flex-col relative font-sans">
-      {/* Restored Header Title */}
       <h1 className={`text-gold font-black tracking-widest text-xl text-center py-4 uppercase cursor-pointer select-none transition-all ${clickCount > 0 ? 'scale-110 blur-[1px]' : ''}`} onClick={handleTitleClick}>BeeClaimer</h1>
       
       <div className="flex-grow overflow-y-auto pb-28">
         {activePage === 'home' ? (
           <div className="space-y-4 animate-in fade-in duration-300">
-            {/* Restored Global Stats Bar */}
             <div className="flex gap-2 mb-2">
               <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl py-2 px-3 flex items-center gap-2">
                 <span className="text-blue-400 text-lg">⚡</span>
@@ -413,7 +415,6 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Balance Card */}
             <div className="bg-gradient-to-br from-[#1e1b0a] to-black rounded-[25px] border border-gold p-6 text-center shadow-lg relative overflow-hidden">
                <div className="absolute top-0 right-0 w-32 h-32 bg-gold/10 blur-3xl -mr-10 -mt-10 rounded-full"></div>
               <span className="text-[11px] font-extrabold text-gold/80 uppercase tracking-widest">Total Available Balance</span>
@@ -442,28 +443,59 @@ const App: React.FC = () => {
                 <button disabled={timers.faucet !== 'Ready'} className="bg-gold text-black px-6 py-3 rounded-2xl font-black text-xs uppercase disabled:bg-black/40" onClick={() => startAction('faucet')}>Claim</button>
               </div>
             </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-[25px] p-6 mt-4">
+               <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[2px] mb-4 flex items-center gap-2">
+                 <span className="w-2 h-2 bg-gold rounded-full"></span>
+                 Your Payout History
+               </h4>
+               {withdrawals.length > 0 ? (
+                 <div className="space-y-3">
+                    {withdrawals.map((w, idx) => (
+                      <div key={idx} className="bg-black/40 border border-white/5 rounded-2xl p-4 flex justify-between items-center">
+                        <div>
+                          <div className="text-white font-bold text-xs">{w.amount.toFixed(4)} TON</div>
+                          <div className="text-[9px] text-gray-500 font-mono mt-1">{new Date(w.time).toLocaleDateString()}</div>
+                        </div>
+                        <div className={`text-[9px] font-black px-3 py-1 rounded-full border ${
+                          w.status === 'PAID' ? 'text-green-500 border-green-500/20 bg-green-500/5' : 
+                          w.status === 'REJECTED' ? 'text-red-500 border-red-500/20 bg-red-500/5' : 
+                          'text-yellow-500 border-yellow-500/20 bg-yellow-500/5'
+                        }`}>
+                          {w.status}
+                        </div>
+                      </div>
+                    ))}
+                 </div>
+               ) : (
+                 <div className="text-center py-8 opacity-30 text-xs font-bold italic">No withdrawals yet. Start mining to earn!</div>
+               )}
+            </div>
           </div>
         ) : (
           <div className="animate-in slide-in-from-right duration-300 space-y-4">
-             {/* Referral Hub remains same */}
             <div className="bg-gradient-to-br from-[#1e1b0a] to-black rounded-[30px] border border-gold p-8 text-center relative overflow-hidden">
                 <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-gold/5 blur-3xl rounded-full"></div>
                 <span className="text-6xl mb-4 block animate-bounce">👥</span>
                 <h2 className="text-2xl font-black mb-6 uppercase tracking-widest text-gold">Referral Hub</h2>
                 
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                   <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-                     <small className="text-[10px] text-gray-500 font-bold uppercase block mb-1">Total Friends</small>
-                     <span className="text-2xl font-black text-white">{user?.friends || 0}</span>
+                <div className="grid grid-cols-3 gap-2 mb-6">
+                   <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col justify-center">
+                     <small className="text-[8px] text-gray-500 font-black uppercase block mb-1">Friends</small>
+                     <span className="text-lg font-black text-white leading-none">{user?.friends || 0}</span>
                    </div>
-                   <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-                     <small className="text-[10px] text-gray-500 font-bold uppercase block mb-1">Earned</small>
-                     <span className="text-2xl font-black text-gold">{user?.refEarned?.toFixed(5) || '0.00000'}</span>
+                   <div className="bg-white/5 border border-gold/20 rounded-2xl p-3 flex flex-col justify-center ring-1 ring-gold/20">
+                     <small className="text-[8px] text-gold font-black uppercase block mb-1">Bonus</small>
+                     <span className="text-lg font-black text-gold leading-none">{config.limits.ref_bonus}</span>
+                   </div>
+                   <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col justify-center">
+                     <small className="text-[8px] text-gray-500 font-black uppercase block mb-1">Total</small>
+                     <span className="text-lg font-black text-white leading-none">{user?.refEarned?.toFixed(5) || '0.00000'}</span>
                    </div>
                 </div>
 
-                <div className="bg-gold/10 border border-gold/20 p-4 rounded-2xl text-xs text-gold mb-6 font-bold leading-relaxed">
-                  🤝 اكسب <span className="text-white text-sm">0.0001 TON</span> فوراً عن كل صديق يسجل في الموقع!
+                <div className="bg-gold/10 border border-gold/20 p-4 rounded-2xl text-[10px] text-gold mb-6 font-black leading-relaxed">
+                  🚀 GET <span className="text-white bg-gold/20 px-2 py-0.5 rounded-md">{config.limits.ref_bonus} TON</span> PER FRIEND JOINED!
                 </div>
                 
                 <div className="bg-black border border-dashed border-gold/30 p-4 rounded-2xl text-[10px] break-all text-gray-400 mb-6 font-mono select-all">
@@ -487,7 +519,6 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Admin and Modals remain Same */}
       {modals.password && (
         <div className="fixed inset-0 bg-black/95 z-[999] flex items-center justify-center p-6 backdrop-blur-xl">
           <div className="bg-[#111] w-full max-w-[320px] rounded-[30px] border border-gold/50 p-8 text-center animate-in zoom-in duration-300">
@@ -501,24 +532,41 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Withdraw Modal */}
       {modals.withdraw && (
         <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-6 backdrop-blur-md">
           <div className="bg-[#0f0f0f] w-full max-w-[360px] rounded-[35px] border border-gold p-8 text-center animate-in zoom-in duration-300 overflow-y-auto max-h-[90vh]">
             <h2 className="text-gold text-2xl font-black mb-2">Withdraw</h2>
-            <p className="text-xs text-gray-500 mb-6 font-bold">Min Payout: <span className="text-white">{config.limits.min_withdraw.toFixed(4)}</span> TON</p>
+            
+            <div className="bg-white/5 border border-white/10 p-4 rounded-2xl mb-6">
+               <div className="text-[10px] text-gray-500 font-bold uppercase mb-1">Minimum Payout</div>
+               <div className="text-xl font-black text-white">{config.limits.min_withdraw.toFixed(4)} <span className="text-xs opacity-40">TON</span></div>
+            </div>
+
+            <div className="bg-blue-600/10 border border-blue-600/30 p-4 rounded-2xl text-left mb-6">
+               <div className="flex items-center gap-2 mb-1">
+                 <span className="text-lg">📢</span>
+                 <span className="text-[11px] font-black text-blue-400 uppercase">FaucetPay Only</span>
+               </div>
+               <p className="text-[10px] text-blue-200/60 leading-relaxed font-bold">
+                 Make sure to enter the email address linked to your <span className="text-white underline underline-offset-2">FaucetPay.io</span> account. 
+                 If you don't have an account, sign up first to get paid.
+               </p>
+            </div>
+
             <input type="email" id="emailInp" placeholder="FaucetPay Email Address" className="w-full bg-black border border-white/10 rounded-2xl p-4 text-center text-sm outline-none mb-3 focus:border-gold transition-all" />
+            
             <div className="relative mb-3">
               <input type="number" id="withdrawAmtInp" placeholder="Amount to Withdraw" className="w-full bg-black border border-white/10 rounded-2xl p-4 text-center text-sm outline-none focus:border-gold transition-all" />
               <button className="absolute right-3 top-1/2 -translate-y-1/2 bg-gold text-black px-3 py-1 rounded-lg text-[10px] font-black" onClick={() => { const input = (document.getElementById('withdrawAmtInp') as HTMLInputElement); if (input) input.value = (user?.balance || 0).toFixed(5); }}>MAX</button>
             </div>
-            <button id="withdrawBtn" className="bg-gold text-black w-full py-4 rounded-2xl font-black text-xs uppercase mb-6 shadow-xl shadow-gold/20 active:scale-95" onClick={handleWithdraw}>Request Payout</button>
-            <div className="mt-6 text-sm font-bold opacity-60 cursor-pointer hover:opacity-100 transition-opacity" onClick={() => setModals(prev => ({ ...prev, withdraw: false }))}>Close Window</div>
+
+            <button id="withdrawBtn" className="bg-gold text-black w-full py-4 rounded-2xl font-black text-xs uppercase mb-6 shadow-xl shadow-gold/20 active:scale-95 transition-transform" onClick={handleWithdraw}>Request Payout</button>
+            
+            <div className="mt-2 text-sm font-bold opacity-60 cursor-pointer hover:opacity-100 transition-opacity" onClick={() => setModals(prev => ({ ...prev, withdraw: false }))}>Close Window</div>
           </div>
         </div>
       )}
 
-      {/* Success Modal */}
       {modals.success && (
         <div className="fixed inset-0 bg-black/90 z-[101] flex items-center justify-center p-6 backdrop-blur-md">
           <div className="bg-[#0f0f0f] w-full max-w-[360px] rounded-[35px] border border-gold p-8 text-center animate-in zoom-in duration-300">
@@ -530,7 +578,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Admin Panel */}
       {modals.admin && (
         <div className="fixed inset-0 bg-black z-[200] flex flex-col animate-in slide-in-from-bottom duration-300">
           <div className="bg-[#111] border-b border-gold/20 p-6 flex justify-between items-center"><div><h2 className="text-gold text-xl font-black">SUPER AMC v8.0</h2><div className="text-[9px] text-gray-500">REALTIME CONTROL</div></div><button className="text-red-500 border border-red-500/50 px-4 py-2 rounded-xl font-black text-xs" onClick={() => setModals(prev => ({ ...prev, admin: false }))}>X</button></div>
